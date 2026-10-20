@@ -1,0 +1,51 @@
+name: PR Review
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: pr-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Lint, type-check and build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Type-check (tsc --noEmit)
+        id: typecheck
+        run: npm run lint
+
+      - name: Build
+        id: build
+        run: npm run build
+
+      - name: Write job summary
+        if: always()
+        run: |
+          {
+            echo "## PR Review Summary"
+            echo ""
+            echo "| Check | Result |"
+            echo "| --- | --- |"
+            echo "| Type-check (\`tsc --noEmit\`) | ${{ steps.typecheck.outcome == 'success' && 'passed' || 'failed' }} |"
+            echo "| Production build | ${{ steps.build.outcome == 'success' && 'passed' || 'failed' }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
